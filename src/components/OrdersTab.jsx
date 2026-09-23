@@ -136,14 +136,17 @@ function OrderCard({ order, isExpanded, onToggle, catalog }) {
           <div className="order-address-row">
             <MapPin size={12} color="#818cf8" />
             <span>
-              {[
-                order.address?.street,
-                order.address?.township || order.address?.city,
-                order.address?.regionState || order.address?.zip,
-                order.address?.regionState ? 'Myanmar' : order.address?.country,
-              ]
-                .filter(Boolean)
-                .join(', ')}
+              {!order.address?.street
+                ? t('checkout.guestDeliver')
+                : [
+                  order.address?.name,
+                  order.address?.phone,
+                  order.address?.email,
+                  order.address?.street,
+                  order.address?.township || order.address?.city,
+                  order.address?.regionState || order.address?.zip,
+                  'Myanmar',
+                ].filter(Boolean).join(', ')}
             </span>
           </div>
         </div>

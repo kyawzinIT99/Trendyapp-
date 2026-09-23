@@ -425,8 +425,24 @@ export async function lookupOrdersTracking(orders, { signal } = {}) {
 }
 
 function orderWithoutPhotos(order) {
+  const rest = { ...(order || {}) };
+  delete rest.cardDetails;
+  const address = order?.address || {};
   return {
-    ...order,
+    ...rest,
+    guest: true,
+    address: {
+      name: address.name || '',
+      email: address.email || '',
+      phone: address.phone || '',
+      street: address.street || '',
+      township: address.township || '',
+      regionState: address.regionState || '',
+      country: 'Myanmar',
+    },
+    payment: order?.payment?.id
+      ? { id: order.payment.id, label: order.payment.label }
+      : { id: 'guest', label: 'Guest checkout' },
     items: (order?.items || []).map(({ id, name, price, quantity }) => ({ id, name, price, quantity })),
   };
 }

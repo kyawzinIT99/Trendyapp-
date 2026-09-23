@@ -1,0 +1,7 @@
+Trendy is a shopping app designed for Myanmar.
+Customers browse in English or Burmese. Prices are in kyats, and delivery stays inside the country.
+The catalog lives on the phone, with a price and a rating on every item.
+When someone checks out, n8n sends that order to one private Google Sheet. Customers never see the sheet.
+The owner calls the courier, then updates the status on the sheet.
+Tracking follows that sheet. Each phone shows only its own order: placed, confirmed, pickup, processing, and delivered home.
+One shop. One sheet. Built for Myanmar.

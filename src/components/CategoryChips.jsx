@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Headphones, Key, Watch, Cpu, ShoppingBag, Grid } from 'lucide-react';
+import { Sparkles, Headphones, Key, Watch, Cpu, ShoppingBag, Grid, Laptop } from 'lucide-react';
 
 const ICON_MAP = {
   Sparkles,
@@ -9,6 +9,7 @@ const ICON_MAP = {
   Cpu,
   ShoppingBag,
   Grid,
+  Laptop,
 };
 
 export function CategoryChips({ categories, activeCategory, onSelectCategory }) {

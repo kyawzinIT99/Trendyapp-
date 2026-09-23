@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="style.css" />
+  <title>n8n</title>
+  <style>
+    h1 { font-size: 84px; margin-top: 16px; }
+    .flow { display: flex; align-items: center; gap: 22px; margin-top: 86px; }
+    .node {
+      width: 430px; min-height: 250px; background: #f6f3ee; border-radius: 28px;
+      padding: 36px 34px; display: flex; flex-direction: column; justify-content: space-between;
+    }
+    .node strong { font-size: 36px; font-weight: 650; }
+    .node span { font-size: 24px; color: #57534e; line-height: 1.35; }
+    .arrow { font-size: 54px; color: #1a8f14; }
+    .note { margin-top: 48px; font-size: 28px; max-width: 1400px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <div class="kicker">Automation</div>
+  <h1>Checkout goes through n8n.</h1>
+  <div class="flow">
+    <div class="node">
+      <strong>Customer</strong>
+      <span>Places the order on the phone. Item photos stay on the device.</span>
+    </div>
+    <div class="arrow">→</div>
+    <div class="node" style="background:#1c1917; color:#f6f3ee;">
+      <strong>n8n</strong>
+      <span style="color:#d6d3d1;">Sends the order — name, price, and quantity — into the shop workflow.</span>
+    </div>
+    <div class="arrow">→</div>
+    <div class="node">
+      <strong>Google Sheet</strong>
+      <span>One private sheet on the owner’s account. Not shared with customers.</span>
+    </div>
+  </div>
+  <p class="note muted">The sheet is the shop’s record. The customer app never opens it.</p>
+  <div class="foot"><span>N8N AUTOMATION</span><span>03</span></div>
+</body>
+</html>

@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="style.css" />
+  <title>Google Sheet</title>
+  <style>
+    h1 { font-size: 72px; margin-top: 12px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 42px; background: #f6f3ee; border-radius: 20px; overflow: hidden; font-size: 26px; }
+    th { text-align: left; background: #1c1917; color: #f6f3ee; padding: 18px 22px; font-weight: 600; }
+    td { padding: 20px 22px; border-top: 1px solid #e7e2da; }
+    tr.now td { background: #e7f6df; }
+    .side { margin-top: 36px; font-size: 30px; max-width: 1500px; line-height: 1.4; }
+  </style>
+</head>
+<body>
+  <div class="kicker">Owner’s Google Sheet</div>
+  <h1>The owner updates the sheet.</h1>
+  <table>
+    <thead>
+      <tr><th>Order</th><th>Item</th><th>Total</th><th>Status</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>TRN-20411</td><td>MacBook Air 13</td><td>Ks 5,290,000</td><td>Confirmed</td></tr>
+      <tr class="now"><td>TRN-20418</td><td>iPhone 18</td><td>Ks 4,250,000</td><td>Order Pickup</td></tr>
+      <tr><td>TRN-20422</td><td>iPhone Duo</td><td>Ks 6,400,000</td><td>Order Placed</td></tr>
+    </tbody>
+  </table>
+  <p class="side">After the sale, the owner calls the courier, then sets the status on this private sheet.</p>
+  <div class="foot"><span>NOT SHARED WITH CUSTOMERS</span><span>04</span></div>
+</body>
+</html>

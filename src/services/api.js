@@ -121,16 +121,202 @@ export const INITIAL_ITEMS = [
       "Illumination": "Dynamic ARGB Neural Array",
       "Connectivity": "Wi-Fi 6 / Bluetooth LE"
     }
+  },
+  {
+    id: 11,
+    name: "MacBook Air 13",
+    category_slug: "devices",
+    category_name: "Mac & iPhone",
+    type: "physical",
+    price: 5290000,
+    original_price: 5690000,
+    rating: 4.8,
+    reviews_count: 186,
+    stock: 8,
+    condition: "brand_new",
+    image: "/images/macbook-air-13.png",
+    photos: ["/images/macbook-air-13.png"],
+    badge: "Ships Today",
+    badge_type: "success",
+    visible: true,
+    featured: true,
+    description: "13-inch thin aluminum laptop for daily work, class, and travel. Fanless, all-day battery, and a bright Liquid Retina display.",
+    specs: {
+      "Display": "13.6-inch Liquid Retina",
+      "Chip": "M4",
+      "Memory": "16GB unified",
+      "Storage": "256GB SSD"
+    }
+  },
+  {
+    id: 12,
+    name: "MacBook Air 15",
+    category_slug: "devices",
+    category_name: "Mac & iPhone",
+    type: "physical",
+    price: 6890000,
+    original_price: 7490000,
+    rating: 4.7,
+    reviews_count: 112,
+    stock: 6,
+    condition: "brand_new",
+    image: "/images/macbook-air-15.png",
+    photos: ["/images/macbook-air-15.png"],
+    badge: "Bigger Screen",
+    badge_type: "accent",
+    visible: true,
+    description: "15-inch MacBook Air with a wider workspace, midnight finish, and the same thin fanless body.",
+    specs: {
+      "Display": "15.3-inch Liquid Retina",
+      "Chip": "M4",
+      "Memory": "16GB unified",
+      "Storage": "512GB SSD"
+    }
+  },
+  {
+    id: 13,
+    name: "MacBook Pro 14",
+    category_slug: "devices",
+    category_name: "Mac & iPhone",
+    type: "physical",
+    price: 9450000,
+    original_price: 9990000,
+    rating: 4.9,
+    reviews_count: 154,
+    stock: 5,
+    condition: "brand_new",
+    image: "/images/macbook-pro-14.png",
+    photos: ["/images/macbook-pro-14.png"],
+    badge: "Pro Pick",
+    badge_type: "accent",
+    visible: true,
+    description: "14-inch MacBook Pro for photo, video, and long work sessions. Liquid Retina XDR display and all-day battery.",
+    specs: {
+      "Display": "14.2-inch Liquid Retina XDR",
+      "Chip": "M4 Pro",
+      "Memory": "24GB unified",
+      "Storage": "512GB SSD"
+    }
+  },
+  {
+    id: 14,
+    name: "MacBook Pro 16",
+    category_slug: "devices",
+    category_name: "Mac & iPhone",
+    type: "physical",
+    price: 14800000,
+    original_price: 15600000,
+    rating: 4.9,
+    reviews_count: 68,
+    stock: 3,
+    condition: "brand_new",
+    image: "/images/macbook-pro-16.png",
+    photos: ["/images/macbook-pro-16.png"],
+    badge: "Limited • 3 Left",
+    badge_type: "warning",
+    visible: true,
+    description: "16-inch MacBook Pro in space black. Large XDR display for editing, design, and studio work.",
+    specs: {
+      "Display": "16.2-inch Liquid Retina XDR",
+      "Chip": "M4 Max",
+      "Memory": "36GB unified",
+      "Storage": "1TB SSD"
+    }
+  },
+  {
+    id: 15,
+    name: "MacBook Air Starlight",
+    category_slug: "devices",
+    category_name: "Mac & iPhone",
+    type: "physical",
+    price: 4990000,
+    original_price: 5390000,
+    rating: 4.6,
+    reviews_count: 91,
+    stock: 10,
+    condition: "brand_new",
+    image: "/images/macbook-air-starlight.png",
+    photos: ["/images/macbook-air-starlight.png"],
+    badge: "Starlight",
+    badge_type: "accent",
+    visible: true,
+    description: "Starlight gold MacBook Air 13. Light aluminum body for notes, browsing, and everyday carry.",
+    specs: {
+      "Finish": "Starlight",
+      "Display": "13.6-inch Liquid Retina",
+      "Chip": "M4",
+      "Storage": "256GB SSD"
+    }
+  },
+  {
+    id: 16,
+    name: "iPhone Duo",
+    category_slug: "devices",
+    category_name: "Mac & iPhone",
+    type: "physical",
+    price: 6400000,
+    original_price: 6900000,
+    rating: 4.8,
+    reviews_count: 73,
+    stock: 7,
+    condition: "brand_new",
+    image: "/images/iphone-duo.png",
+    photos: ["/images/iphone-duo.png"],
+    badge: "Pair Set",
+    badge_type: "success",
+    visible: true,
+    description: "A matched pair of iPhones sold together. Same finish, same storage, ready for two people in one order.",
+    specs: {
+      "Set": "Two phones",
+      "Display": "6.3-inch each",
+      "Storage": "256GB each",
+      "Finish": "Silver pair"
+    }
+  },
+  {
+    id: 17,
+    name: "iPhone 18",
+    category_slug: "devices",
+    category_name: "Mac & iPhone",
+    type: "physical",
+    price: 4250000,
+    original_price: 4590000,
+    rating: 4.9,
+    reviews_count: 240,
+    stock: 12,
+    condition: "brand_new",
+    image: "/images/iphone-18.png",
+    photos: ["/images/iphone-18.png"],
+    badge: "New",
+    badge_type: "success",
+    visible: true,
+    featured: true,
+    description: "iPhone 18 in starlight. Bright display, all-day battery, and a camera built for daylight and night shots.",
+    specs: {
+      "Display": "6.3-inch",
+      "Chip": "A19",
+      "Storage": "256GB",
+      "Finish": "Starlight"
+    }
   }
 ];
 
 export const CATEGORIES = [
   { id: "all", name: "All Trendy", icon: "Sparkles" },
+  { id: "devices", name: "Mac & iPhone", icon: "Laptop" },
   { id: "hardware", name: "Audio Tech", icon: "Headphones" },
   { id: "digital", name: "Digital Passes", icon: "Key" },
   { id: "smart_tech", name: "Smart Devices", icon: "Watch" },
   { id: "collectibles", name: "Cybernetics", icon: "Cpu" }
 ];
+
+const DEVICE_IDS = new Set([11, 12, 13, 14, 15, 16, 17]);
+
+function withDeviceListings(items) {
+  const present = new Set(items.map((item) => item.id));
+  const missing = INITIAL_ITEMS.filter((item) => DEVICE_IDS.has(item.id) && !present.has(item.id));
+  return missing.length ? [...items, ...missing] : items;
+}
 
 export function getStoredItems() {
   try {
@@ -138,9 +324,9 @@ export function getStoredItems() {
     if (saved) {
       const parsed = JSON.parse(saved);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        const migrated = migrateCatalogToMmk(parsed);
+        const migrated = withDeviceListings(migrateCatalogToMmk(parsed));
         markCurrencyMmk();
-        const changed = migrated.some((item, index) => (
+        const changed = migrated.length !== parsed.length || migrated.some((item, index) => (
           item.price !== parsed[index]?.price || item.original_price !== parsed[index]?.original_price
         ));
         if (changed) {

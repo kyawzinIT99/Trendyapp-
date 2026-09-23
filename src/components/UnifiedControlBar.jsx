@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Sparkles, Headphones, Key, Watch, Cpu, SlidersHorizontal, Check } from 'lucide-react';
+import { Sparkles, Headphones, Key, Watch, Cpu, Laptop, SlidersHorizontal, Check } from 'lucide-react';
 import { useI18n } from '../services/i18n.jsx';
 
-const ICON_MAP = { Sparkles, Headphones, Key, Watch, Cpu };
+const ICON_MAP = { Sparkles, Headphones, Key, Watch, Cpu, Laptop };
 
 const SORT_IDS = ['featured', 'price_asc', 'price_desc', 'rating'];
 

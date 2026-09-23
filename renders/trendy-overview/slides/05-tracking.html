@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="stylesheet" href="style.css" />
+  <title>Tracking</title>
+  <style>
+    h1 { font-size: 72px; margin-top: 10px; }
+    .steps { margin-top: 48px; display: grid; gap: 16px; }
+    .step { display: grid; grid-template-columns: 54px 1fr auto; gap: 22px; align-items: center; background: #f6f3ee; border-radius: 18px; padding: 16px 26px; }
+    .dot { width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; }
+    .done { background: #1a8f14; color: white; }
+    .now { background: #1c1917; color: #f6f3ee; }
+    .wait { background: #e7e2da; color: #78716c; }
+    .label { font-size: 30px; font-weight: 630; }
+    .my { font-family: "Noto Myanmar", "Myanmar MN", sans-serif; font-size: 22px; color: #78716c; }
+    .lead { margin-top: 28px; font-size: 28px; }
+  </style>
+</head>
+<body>
+  <div class="kicker">Your delivery</div>
+  <h1>Each phone tracks only its own order.</h1>
+  <p class="lead muted">The shop updates the sheet. The customer sees these five steps.</p>
+  <div class="steps">
+    <div class="step"><div class="dot done">✓</div><div class="label">Order Placed</div><div class="my">အော်ဒါတင်ပြီး</div></div>
+    <div class="step"><div class="dot done">✓</div><div class="label">Confirmed</div><div class="my">အတည်ပြုပြီး</div></div>
+    <div class="step"><div class="dot now">3</div><div class="label">Order Pickup</div><div class="my">ပစ္စည်းထုတ်ယူရန်</div></div>
+    <div class="step"><div class="dot wait">4</div><div class="label">Order Processing</div><div class="my">ပြင်ဆင်ဆောင်ရွက်နေ</div></div>
+    <div class="step"><div class="dot wait">5</div><div class="label">Delivered to your home</div><div class="my">အိမ်အရောက်ပို့ပြီး</div></div>
+  </div>
+  <div class="foot"><span>TRACKING FOLLOWS THE SHEET</span><span>05</span></div>
+</body>
+</html>

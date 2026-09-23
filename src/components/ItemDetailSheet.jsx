@@ -27,8 +27,8 @@ export function ItemDetailSheet({
   const isDigital = item.type === 'digital';
   const maxQty    = isDigital ? 10 : Math.max(1, Math.min(10, item.stock || 10));
 
-  const photos = [item.image, '/images/headset.jpg', '/images/smartwatch.jpg', '/images/orb.jpg']
-    .filter((v, i, a) => a.indexOf(v) === i)
+  const photos = (Array.isArray(item.photos) && item.photos.length ? item.photos : [item.image])
+    .filter((v, i, a) => v && a.indexOf(v) === i)
     .slice(0, 3);
 
   const discount = item.original_price

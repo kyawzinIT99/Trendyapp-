@@ -1,0 +1,40 @@
+@font-face {
+  font-family: "Noto Myanmar";
+  src: url("NotoSansMyanmar.ttc") format("collection");
+  font-weight: 400;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+.my { font-family: "Noto Myanmar", "Myanmar MN", sans-serif; }
+html, body { width: 1920px; height: 1080px; overflow: hidden; background: #eceae4; color: #1c1917; }
+body {
+  font-family: "Avenir Next", "Helvetica Neue", sans-serif;
+  padding: 88px 104px;
+  position: relative;
+}
+.kicker {
+  font-size: 22px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: #78716c;
+  font-weight: 600;
+}
+h1 {
+  font-family: "Didot", "Bodoni 72", "Times New Roman", serif;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 0.92;
+}
+.rule { width: 92px; height: 3px; background: #1a8f14; margin: 28px 0; }
+.muted { color: #57534e; }
+.green { color: #146b12; }
+.foot {
+  position: absolute;
+  left: 104px;
+  right: 104px;
+  bottom: 64px;
+  display: flex;
+  justify-content: space-between;
+  font-size: 22px;
+  letter-spacing: 0.08em;
+  color: #78716c;
+}

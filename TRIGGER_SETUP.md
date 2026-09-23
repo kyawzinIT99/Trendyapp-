@@ -7,4 +7,6 @@ This React/Vite app is browser-only. Keep Trigger.dev secret keys and third-part
 3. Run `npm install`, then `npm run trigger:dev` to register the safe `trendy-development-check` task in the development environment. No production deployment is involved.
 4. Put additional tasks in `trigger/`. Store their external credentials as secret environment variables in Trigger.dev's Development environment. Keep code in Git, not secrets.
 
+The `trendy-n8n-google-sheets` task lists the existing n8n workflow and its `Orders`, `CartEvents`, and `Users` tabs in Trigger.dev. It reports configuration only and does not write to the sheet.
+
 The existing checkout and cart events still use n8n. A future Trigger.dev integration needs a trusted backend endpoint before browser events can trigger secret-authenticated tasks. GitHub automatic deployment should stay disabled until the workflow and tracking branch are chosen.

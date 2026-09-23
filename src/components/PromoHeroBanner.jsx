@@ -67,6 +67,20 @@ export function PromoHeroBanner({ items = [], onSelectItem }) {
           </div>
         </div>
 
+        <div className="spotlight-actions">
+          <button
+            type="button"
+            className="spotlight-cta"
+            onClick={(event) => {
+              event.stopPropagation();
+              onSelectItem(item);
+            }}
+          >
+            {t('spot.view')}
+            <span aria-hidden="true">↗</span>
+          </button>
+        </div>
+
         {/* Progress dots — the active one fills over the rotation window */}
         <div className="spotlight-dots" onClick={(e) => e.stopPropagation()}>
           {spotlight.map((s, i) => (

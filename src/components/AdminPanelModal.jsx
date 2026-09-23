@@ -336,7 +336,7 @@ export function AdminPanelModal({
             <div className="admin-live-banner">
               Photo, hide, featured, and order apply to the phone frame immediately. Name, price, and copy apply on Save.
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 20 }}>
+            <div className="admin-editor-layout" style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 20 }}>
               {/* Item Selector List */}
               <div style={{ borderRight: '1px solid rgba(28,25,23,0.08)', paddingRight: 14 }}>
                 <div style={{ fontSize: '0.74rem', color: '#64748b', fontWeight: 700, textTransform: 'uppercase', marginBottom: 10 }}>
@@ -460,7 +460,7 @@ export function AdminPanelModal({
                   </div>
 
                   {/* General Details Section */}
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+                  <div className="admin-product-fields" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
                     <div className="form-group-n8n">
                       <label className="form-label-n8n">Product Name</label>
                       <input
@@ -624,7 +624,7 @@ export function AdminPanelModal({
               </div>
             </div>
 
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+            <div className="admin-product-fields" style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
               <div className="form-group-n8n">
                 <label className="form-label-n8n">Item Name *</label>
                 <input

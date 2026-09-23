@@ -1,0 +1,44 @@
+// ── Firestore Security Rules — Trendy App ────────────────────────────────────
+// Deploy with: npx -y firebase-tools@latest deploy --only firestore:rules
+//
+// Rules ensure each user can ONLY read/write their own data.
+
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── User profiles ───────────────────────────────────────────────────────
+    // Each user can only read and write their own profile
+    match /users/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+
+      // ── Per-user subcollections (cart, orders, favorites) ───────────────
+      match /data/{document} {
+        allow read, write: if request.auth != null && request.auth.uid == userId;
+      }
+    }
+
+    // ── Admin: store config (payment settings, catalog) ─────────────────────
+    // Public read so checkout can display bank details
+    // Write only by authenticated admin (set custom claims in Firebase Console)
+    match /storeConfig/{document} {
+      allow read: if true;
+      allow write: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    // ── Orders (flat collection for admin panel access) ─────────────────────
+    match /orders/{orderId} {
+      // Users can only read their own orders
+      allow read: if request.auth != null && request.auth.uid == resource.data.userId;
+      // Users can create orders (but not modify existing ones)
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      // Only admin can update order status
+      allow update: if request.auth != null && request.auth.token.admin == true;
+    }
+
+    // ── Default: deny everything else ───────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

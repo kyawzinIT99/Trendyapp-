@@ -3743,6 +3743,54 @@ html[lang="my"] .ucb-chip {
   gap: 5px;
   flex-shrink: 0;
 }
+.bag-line { display: flex; flex-direction: column; gap: 8px; }
+.bag-change-btn,
+.bag-done-btn,
+.bag-keep-btn {
+  border: 1px solid rgba(28, 25, 23, 0.16);
+  background: #f6f3ee;
+  color: #1c1917;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.72rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.bag-change-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  background: #f6f3ee;
+}
+.bag-qty-stepper { display: flex; align-items: center; gap: 8px; }
+.bag-remove-ask,
+.bag-remove-yes {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  background: #1c1917;
+  color: #f6f3ee;
+  border: 0;
+  border-radius: 12px;
+  padding: 11px 12px;
+  font-size: 0.82rem;
+  font-weight: 650;
+  cursor: pointer;
+}
+.bag-remove-yes { background: #9f1239; }
+.bag-remove-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: #44403c;
+}
+.bag-keep-btn,
+.bag-done-btn { align-self: flex-start; }
 .cart-qty-btn {
   width: 24px; height: 24px;
   background: rgba(255,255,255,0.07);

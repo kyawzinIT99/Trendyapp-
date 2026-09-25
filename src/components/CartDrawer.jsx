@@ -1,7 +1,59 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { X, Trash2, ShoppingBag, ArrowRight, Sparkles, LogIn, LogOut, User } from 'lucide-react';
 import { useI18n } from '../services/i18n.jsx';
 import { catalogPhotoFor } from '../services/catalogImages';
+
+export function BagItemRow({ item, catalog, onUpdateQuantity, onRemoveItem }) {
+  const { t, money } = useI18n();
+  const [editing, setEditing] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+
+  const closeEdit = () => {
+    setEditing(false);
+    setConfirmRemove(false);
+  };
+
+  return (
+    <div className="bag-line">
+      <div className="cart-item-row">
+        <img src={catalogPhotoFor(item, catalog)} alt={item.name} className="cart-item-thumb" />
+        <div className="cart-item-info">
+          <div className="cart-item-name">{item.name}</div>
+          <div className="cart-item-price">{money(item.price)}</div>
+        </div>
+        <div className="cart-item-controls">
+          <span className="cart-qty-value">{t('bag.qty', { n: item.quantity })}</span>
+          {!editing && (
+            <button type="button" className="bag-change-btn" onClick={() => setEditing(true)}>
+              {t('bag.change')}
+            </button>
+          )}
+        </div>
+      </div>
+      {editing && (
+        <div className="bag-change-panel">
+          <div className="bag-qty-stepper">
+            <button type="button" className="cart-qty-btn" aria-label="Decrease" onClick={() => onUpdateQuantity(item.id, Math.max(1, item.quantity - 1))}>−</button>
+            <span className="cart-qty-value">{item.quantity}</span>
+            <button type="button" className="cart-qty-btn" aria-label="Increase" onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}>+</button>
+          </div>
+          {!confirmRemove ? (
+            <button type="button" className="bag-remove-ask" onClick={() => setConfirmRemove(true)}>
+              <Trash2 size={14} /> {t('cart.remove')}
+            </button>
+          ) : (
+            <div className="bag-remove-confirm">
+              <span>{t('bag.removeAsk')}</span>
+              <button type="button" className="bag-remove-yes" onClick={() => onRemoveItem(item.id)}>{t('cart.remove')}</button>
+              <button type="button" className="bag-keep-btn" onClick={() => setConfirmRemove(false)}>{t('bag.keep')}</button>
+            </div>
+          )}
+          <button type="button" className="bag-done-btn" onClick={closeEdit}>{t('bag.done')}</button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function CartDrawer({
   isOpen,
@@ -74,35 +126,13 @@ export function CartDrawer({
           <>
             <div className="cart-items-list">
               {cartItems.map((item) => (
-                <div key={item.id} className="cart-item-row">
-                  <img src={catalogPhotoFor(item, catalog)} alt={item.name} className="cart-item-thumb" />
-                  <div className="cart-item-info">
-                    <div className="cart-item-name">{item.name}</div>
-                    <div className="cart-item-price">{money(item.price)}</div>
-                  </div>
-
-                  {/* Qty controls + Delete */}
-                  <div className="cart-item-controls">
-                    <button
-                      className="cart-qty-btn"
-                      onClick={() => onUpdateQuantity(item.id, Math.max(1, item.quantity - 1))}
-                    >−</button>
-                    <span className="cart-qty-value">{item.quantity}</span>
-                    <button
-                      className="cart-qty-btn"
-                      onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                    >+</button>
-
-                    {/* Prominent delete button */}
-                    <button
-                      className="cart-delete-btn"
-                      onClick={() => onRemoveItem(item.id)}
-                      title={t('cart.remove')}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
+                <BagItemRow
+                  key={item.id}
+                  item={item}
+                  catalog={catalog}
+                  onUpdateQuantity={onUpdateQuantity}
+                  onRemoveItem={onRemoveItem}
+                />
               ))}
             </div>
 

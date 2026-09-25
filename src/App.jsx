@@ -4,7 +4,7 @@ import { MobileHeader } from './components/MobileHeader';
 import { UnifiedControlBar } from './components/UnifiedControlBar';
 import { ItemCard } from './components/ItemCard';
 import { ItemDetailSheet } from './components/ItemDetailSheet';
-import { CartDrawer } from './components/CartDrawer';
+import { BagItemRow, CartDrawer } from './components/CartDrawer';
 import { BottomNav } from './components/BottomNav';
 import { AdminPanelModal } from './components/AdminPanelModal';
 import { CheckoutScreen } from './components/CheckoutScreen';
@@ -620,18 +620,13 @@ export default function App() {
                 ) : (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                     {cartItems.map((item) => (
-                      <div key={item.id} className="cart-item-row" style={{ padding: 12 }}>
-                        <img src={catalogPhotoFor(item, items)} alt={item.name} className="cart-item-thumb" style={{ width: 56, height: 56 }} />
-                        <div className="cart-item-info">
-                          <div className="cart-item-name">{item.name}</div>
-                          <div className="cart-item-price">{money(item.price)}</div>
-                        </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <button onClick={() => handleUpdateCartQuantity(item.id, Math.max(1, item.quantity - 1))} style={{ color: '#94a3b8', padding: '3px 8px', background: '#182030', borderRadius: 4 }}>-</button>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 700, minWidth: 18, textAlign: 'center' }}>{item.quantity}</span>
-                          <button onClick={() => handleUpdateCartQuantity(item.id, item.quantity + 1)} style={{ color: '#94a3b8', padding: '3px 8px', background: '#182030', borderRadius: 4 }}>+</button>
-                        </div>
-                      </div>
+                      <BagItemRow
+                        key={item.id}
+                        item={item}
+                        catalog={items}
+                        onUpdateQuantity={handleUpdateCartQuantity}
+                        onRemoveItem={handleRemoveFromCart}
+                      />
                     ))}
                     <button className="checkout-n8n-btn" style={{ marginTop: 14 }} onClick={handleGoToCheckout}>
                       <span>{t('bag.checkout', { total: money(cartItems.reduce((a, b) => a + b.price * b.quantity, 0)) })}</span>

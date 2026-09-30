@@ -339,6 +339,42 @@ export async function verifyOwnerOtp({ name, phone, email, code, purpose } = {})
   return payload;
 }
 
+export async function listSheetUsers(viewer) {
+  const payload = await postStaffEvent('user.list', {
+    actorPhone: viewer?.phone || '',
+    actorEmail: viewer?.email || '',
+    actorName: viewer?.name || '',
+  });
+  if (!payload.connected || !Array.isArray(payload.users)) return { connected: false, users: [] };
+  return { connected: true, users: payload.users };
+}
+
+export async function saveSheetUser({ name, phone, email, role, active, viewer } = {}) {
+  return postStaffEvent('user.account_saved', {
+    name,
+    phone,
+    email,
+    role,
+    active,
+    source: 'admin',
+    actorPhone: viewer?.phone || '',
+    actorEmail: viewer?.email || '',
+    actorName: viewer?.name || '',
+  });
+}
+
+export async function deleteSheetUser({ phone, actorPhone, actorEmail } = {}) {
+  const payload = await postStaffEvent('user.account_deleted', { phone, actorPhone, actorEmail });
+  if (!payload.connected) return { connected: false, deleted: false };
+  return payload;
+}
+
+export async function joinOrdersSheet({ name, phone, email } = {}) {
+  const payload = await postStaffEvent('user.sheet_join', { name, phone, email });
+  if (!payload.connected) return { connected: false, joined: false };
+  return payload;
+}
+
 export async function lookupStaffOnSheet({ phone, name } = {}) {
   const config = getBackendN8NConfig();
   if (!config.enabled || !config.webhookUrl) {
@@ -369,16 +405,54 @@ export async function lookupStaffOnSheet({ phone, name } = {}) {
   }
 }
 
+async function readTrackingGroup(orders, sheetId, signal) {
+  return postTrackingLookup({
+    ...(sheetId ? { ordersSheetId: sheetId } : {}),
+    orders: orders.map((order) => ({
+      orderId: order.orderId,
+      trackingToken: order.trackingToken,
+    })),
+  }, { signal });
+}
+
+function applyTrackingGroup(group, posted, updates, notFoundIds) {
+  if (!posted.ok) return posted.error || '';
+  const payload = posted.payload || {};
+  const resultMap = payload.batch ? (payload.results || {}) : { [group[0].orderId]: payload };
+  let error = '';
+  group.forEach((order) => {
+    const parsed = parseTrackingUpdate(resultMap[order.orderId]);
+    if (parsed.success) {
+      updates.push({ orderId: order.orderId, ordersSheetId: order.ordersSheetId || '', result: parsed });
+    } else if (parsed.notFound) {
+      notFoundIds.push(order.orderId);
+      if (!error) error = parsed.error;
+    } else if (!error) {
+      error = parsed.error;
+    }
+  });
+  return error;
+}
+
 export async function lookupOrderTracking(order, { signal } = {}) {
   if (!order?.orderId || !order?.trackingToken) {
     return { success: false, error: 'Live tracking is unavailable for this older order', legacy: true };
   }
-  const posted = await postTrackingLookup({
+  const onOwnerSheet = await postTrackingLookup({
     orderId: order.orderId,
     trackingToken: order.trackingToken,
   }, { signal });
-  if (!posted.ok) return { success: false, error: posted.error };
-  return parseTrackingUpdate(posted.payload);
+  if (!onOwnerSheet.ok) return { success: false, error: onOwnerSheet.error };
+  const ownerUpdate = parseTrackingUpdate(onOwnerSheet.payload);
+  if (ownerUpdate.success || !order.ordersSheetId) return ownerUpdate;
+  if (!ownerUpdate.notFound) return ownerUpdate;
+  const onOwnSheet = await postTrackingLookup({
+    orderId: order.orderId,
+    trackingToken: order.trackingToken,
+    ordersSheetId: order.ordersSheetId,
+  }, { signal });
+  if (!onOwnSheet.ok) return ownerUpdate;
+  return parseTrackingUpdate(onOwnSheet.payload);
 }
 
 export async function lookupOrdersTracking(orders, { signal } = {}) {
@@ -387,34 +461,61 @@ export async function lookupOrdersTracking(orders, { signal } = {}) {
     return { success: true, updates: [] };
   }
 
-  const posted = await postTrackingLookup({
-    orders: trackable.map((order) => ({
-      orderId: order.orderId,
-      trackingToken: order.trackingToken,
-    })),
-  }, { signal });
+  const updates = [];
+  const notFoundIds = [];
+  let firstError = '';
+  let reached = false;
 
-  if (!posted.ok) {
-    return { success: false, updates: [], error: posted.error };
+  const ownerSheet = await readTrackingGroup(trackable, '', signal);
+  if (ownerSheet.ok) {
+    reached = true;
+    const missed = [];
+    const ownerError = applyTrackingGroup(trackable, ownerSheet, updates, missed);
+    if (ownerError && updates.length === 0) firstError = ownerError;
+    const found = new Set(updates.map((entry) => entry.orderId));
+    const remaining = trackable.filter((order) => !found.has(order.orderId) && order.ordersSheetId);
+    const groups = new Map();
+    remaining.forEach((order) => {
+      const key = String(order.ordersSheetId);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(order);
+    });
+    for (const [sheetId, group] of groups) {
+      const posted = await readTrackingGroup(group, sheetId, signal);
+      if (!posted.ok) {
+        if (!firstError) firstError = posted.error;
+        continue;
+      }
+      const error = applyTrackingGroup(group, posted, updates, notFoundIds);
+      if (error && !firstError) firstError = error;
+    }
+    trackable.forEach((order) => {
+      const foundNow = updates.some((entry) => entry.orderId === order.orderId);
+      if (!foundNow && !order.ordersSheetId && !notFoundIds.includes(order.orderId)) {
+        notFoundIds.push(order.orderId);
+      }
+    });
+  } else {
+    firstError = ownerSheet.error;
+    const groups = new Map();
+    trackable.forEach((order) => {
+      const key = String(order.ordersSheetId || '');
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(order);
+    });
+    for (const [sheetId, group] of groups) {
+      if (!sheetId) continue;
+      const posted = await readTrackingGroup(group, sheetId, signal);
+      if (!posted.ok) continue;
+      reached = true;
+      const error = applyTrackingGroup(group, posted, updates, notFoundIds);
+      if (error && !firstError) firstError = error;
+    }
   }
 
-  const payload = posted.payload || {};
-  const resultMap = payload.batch ? (payload.results || {}) : { [trackable[0].orderId]: payload };
-  const updates = [];
-  let firstError = '';
-  let notFoundIds = [];
-
-  trackable.forEach((order) => {
-    const parsed = parseTrackingUpdate(resultMap[order.orderId]);
-    if (parsed.success) {
-      updates.push({ orderId: order.orderId, result: parsed });
-    } else if (parsed.notFound) {
-      notFoundIds.push(order.orderId);
-      if (!firstError) firstError = parsed.error;
-    } else if (!firstError) {
-      firstError = parsed.error;
-    }
-  });
+  if (!reached && updates.length === 0) {
+    return { success: false, updates: [], error: firstError || 'Live tracking is temporarily unavailable' };
+  }
 
   return {
     success: updates.length > 0,

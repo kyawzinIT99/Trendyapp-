@@ -24,7 +24,7 @@ import { Heart, PackageCheck, CheckCircle, TrendingUp, SearchX } from 'lucide-re
 import { PromoHeroBanner } from './components/PromoHeroBanner';
 import { useI18n } from './services/i18n.jsx';
 import { migrateCartToMmk, migrateOrdersToMmk } from './services/currency';
-import { isBusinessOwner, canReviseBackend } from './services/roles';
+import { isBusinessOwner, canReviseBackend, isSheetOwner } from './services/roles';
 
 export default function App() {
   const { t, money } = useI18n();
@@ -209,7 +209,9 @@ export default function App() {
       }];
     });
     showToast(t('toast.added', { qty: quantity, name: item.name }));
-    dispatchBackendN8NEvent('item.cart_added', { itemId: item.id, itemName: item.name, quantity });
+    if (!user || isSheetOwner(user)) {
+      dispatchBackendN8NEvent('item.cart_added', { itemId: item.id, itemName: item.name, quantity });
+    }
   };
 
   const handleUpdateCartQuantity = (id, quantity) => {
@@ -227,7 +229,10 @@ export default function App() {
     setCheckoutView('checkout');
   };
 
-  const handleOrderConfirmed = async (order) => {
+  const handleOrderConfirmed = async (rawOrder) => {
+    const order = (!user || isSheetOwner(user) || !user.ordersSheetId)
+      ? rawOrder
+      : { ...rawOrder, ordersSheetId: user.ordersSheetId };
     bindStarted.current.add(order.orderId);
     setCurrentOrder(order);
     setCheckoutView('confirm');
@@ -252,6 +257,15 @@ export default function App() {
   });
   const ordersRef = useRef(orders);
   useEffect(() => { ordersRef.current = orders; }, [orders]);
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
+
+  const attachOwnSheet = useCallback((order) => {
+    const current = userRef.current;
+    if (!order || order.ordersSheetId) return order;
+    if (!current || isSheetOwner(current) || !current.ordersSheetId) return order;
+    return { ...order, ordersSheetId: current.ordersSheetId };
+  }, []);
 
   const bindStarted = useRef(new Set());
 
@@ -268,19 +282,24 @@ export default function App() {
       if (bindStarted.current.has(order.orderId)) return;
       bindStarted.current.add(order.orderId);
       (async () => {
+        const tracked = attachOwnSheet(order);
         for (let attempt = 0; attempt < 4; attempt += 1) {
-          const lookup = await lookupOrderTracking(order);
+          const lookup = await lookupOrderTracking(tracked);
           if (lookup.success) {
             setOrders((previous) => previous.map((item) => (
-              item.orderId === order.orderId ? { ...item, ...lookup.update, sheetBound: true } : item
+              item.orderId === order.orderId
+                ? { ...item, ...lookup.update, ordersSheetId: tracked.ordersSheetId || item.ordersSheetId, sheetBound: true }
+                : item
             )));
             return;
           }
           if (lookup.notFound) {
-            const submitted = await dispatchOrderSubmitted(order, { attempts: 2 });
+            const submitted = await dispatchOrderSubmitted(tracked, { attempts: 2 });
             if (submitted.success) {
               setOrders((previous) => previous.map((item) => (
-                item.orderId === order.orderId ? { ...item, sheetBound: true } : item
+                item.orderId === order.orderId
+                  ? { ...item, ordersSheetId: tracked.ordersSheetId || item.ordersSheetId, sheetBound: true }
+                  : item
               )));
               return;
             }
@@ -290,11 +309,13 @@ export default function App() {
         bindStarted.current.delete(order.orderId);
       })();
     });
-  }, [orders]);
+  }, [orders, attachOwnSheet]);
 
   const refreshTracking = useCallback(async () => {
     if (typeof document !== 'undefined' && document.hidden) return;
-    const trackable = ordersRef.current.filter((order) => order.orderId && order.trackingToken);
+    const trackable = ordersRef.current
+      .filter((order) => order.orderId && order.trackingToken)
+      .map(attachOwnSheet);
     if (trackable.length === 0) {
       setTrackingSync({ status: 'idle', lastChecked: null, error: '' });
       return;
@@ -310,14 +331,16 @@ export default function App() {
           const hit = updates.find((entry) => entry.orderId === order.orderId);
           if (!hit) return order;
           const update = hit.result.update;
+          const sheetId = order.ordersSheetId || hit.ordersSheetId || '';
           const same =
             order.deliveryStatus === update.deliveryStatus &&
             order.paymentStatus === update.paymentStatus &&
             (order.statusNote || '') === (update.statusNote || '') &&
-            (order.statusUpdatedAt || '') === (update.statusUpdatedAt || '');
+            (order.statusUpdatedAt || '') === (update.statusUpdatedAt || '') &&
+            (order.ordersSheetId || '') === sheetId;
           if (same) return order;
           changed = true;
-          return { ...order, ...update, sheetBound: true };
+          return { ...order, ...update, ordersSheetId: sheetId || order.ordersSheetId, sheetBound: true };
         });
         return changed ? next : previous;
       });
@@ -333,7 +356,7 @@ export default function App() {
       lastChecked: new Date(),
       error: success ? '' : (error || 'Live tracking is temporarily unavailable'),
     });
-  }, []);
+  }, [attachOwnSheet]);
 
   useEffect(() => {
     refreshTracking();
@@ -358,13 +381,15 @@ export default function App() {
     setUser(signedInUser);
     setShowSignIn(false);
     showToast(t('toast.welcome', { name: signedInUser.name }));
-    dispatchBackendN8NEvent('user.account_saved', {
-      name: signedInUser.name,
-      phone: signedInUser.phone,
-      email: signedInUser.email || '',
-      role: signedInUser.role,
-      active: signedInUser.active || 'Yes',
-    });
+    if (isSheetOwner(signedInUser)) {
+      dispatchBackendN8NEvent('user.account_saved', {
+        name: signedInUser.name,
+        phone: signedInUser.phone,
+        email: signedInUser.email || '',
+        role: signedInUser.role,
+        active: signedInUser.active || 'Yes',
+      });
+    }
   };
 
   const openAdminPanel = () => {

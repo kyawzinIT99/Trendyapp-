@@ -29,12 +29,41 @@ export function isBusinessOwner(user) {
 }
 
 const BACKEND_OWNER_EMAIL = 'kyawzin.ccna@gmail.com';
+const BACKEND_OWNER_PHONE = '095043252';
+
+function compactName(value) {
+  return String(value || '').replace(/\s+/g, '').toLowerCase();
+}
+
+function samePhone(left, right) {
+  const a = digitsOnly(left);
+  const b = digitsOnly(right);
+  if (a.length < 6 || b.length < 6) return false;
+  return a === b || a.endsWith(b) || b.endsWith(a);
+}
+
+/** The shop account stored on the main sheet. Other owners must not see it. */
+export function isSheetOwner(user) {
+  const email = String(user?.email || '').trim().toLowerCase();
+  if (email === BACKEND_OWNER_EMAIL) return true;
+  if (samePhone(user?.phone, BACKEND_OWNER_PHONE)) return true;
+  return compactName(user?.name) === 'kyawzin' && email === BACKEND_OWNER_EMAIL;
+}
 
 /** Only this account may revise the backend automation settings. */
 export function canReviseBackend(user) {
   const email = String(user?.email || '').trim().toLowerCase();
-  const name = String(user?.name || '').replace(/\s+/g, '').toLowerCase();
-  return email === BACKEND_OWNER_EMAIL && name === 'kyawzin';
+  return email === BACKEND_OWNER_EMAIL && compactName(user?.name) === 'kyawzin';
+}
+
+export function accountVisibleTo(viewer, account) {
+  if (!isSheetOwner(account)) return true;
+  return isSheetOwner(viewer);
+}
+
+/** The row belongs to the person who is signed in. A shared email is not the same person. */
+export function isOwnAccount(viewer, account) {
+  return samePhone(viewer?.phone, account?.phone);
 }
 
 export function roleFromSheet(value) {
@@ -114,4 +143,10 @@ export function registerStaffAccount({ name, phone, email, role }) {
   accounts.push(row);
   saveStaffAccounts(accounts);
   return { user: toUser(row) };
+}
+
+export function removeStaffAccount(phone) {
+  const cleanPhone = digitsOnly(phone);
+  if (!cleanPhone) return;
+  saveStaffAccounts(listStaffAccounts().filter((row) => digitsOnly(row.phone) !== cleanPhone));
 }

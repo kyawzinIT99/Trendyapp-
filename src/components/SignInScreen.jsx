@@ -5,8 +5,8 @@ import {
   renderGoogleButton,
   GOOGLE_CLIENT_ID,
 } from '../services/authService';
-import { ROLE_KEEPER, ROLE_OWNER, registerStaffAccount, userFromSheetRow } from '../services/roles';
-import { lookupStaffOnSheet, requestOwnerOtp, verifyOwnerOtp } from '../services/n8nService';
+import { ROLE_KEEPER, ROLE_OWNER, isSheetOwner, registerStaffAccount, userFromSheetRow } from '../services/roles';
+import { joinOrdersSheet, lookupStaffOnSheet, requestOwnerOtp, verifyOwnerOtp } from '../services/n8nService';
 import { useI18n } from '../services/i18n.jsx';
 
 export function SignInScreen({ onSignIn, onContinueAsGuest }) {
@@ -120,7 +120,22 @@ export function SignInScreen({ onSignIn, onContinueAsGuest }) {
           setError(t('signin.otpFailed'));
           return;
         }
-        onSignIn(sheetUser);
+        if (isSheetOwner(sheetUser)) {
+          onSignIn(sheetUser);
+          return;
+        }
+        setLoading(true);
+        const joined = await joinOrdersSheet({
+          name: sheetUser.name,
+          phone: sheetUser.phone,
+          email: sheetUser.email,
+        });
+        setLoading(false);
+        onSignIn({
+          ...sheetUser,
+          ordersSheetUrl: joined.sheetUrl || '',
+          ordersSheetId: joined.spreadsheetId || '',
+        });
         return;
       }
       await sendOwnerCode(typedEmail, 'signup');

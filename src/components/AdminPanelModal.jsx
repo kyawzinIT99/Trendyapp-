@@ -19,7 +19,8 @@ import {
   EyeOff,
   Star,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  Users
 } from 'lucide-react';
 import { saveStoredItems, resetCatalogToDefault, generateUniqueId, CATEGORIES } from '../services/api';
 import {
@@ -33,10 +34,24 @@ import {
   saveBackendN8NConfig,
   getBackendLogs,
   clearBackendLogs,
-  dispatchBackendN8NEvent
+  dispatchBackendN8NEvent,
+  listSheetUsers,
+  saveSheetUser,
+  deleteSheetUser
 } from '../services/n8nService';
 import { getPaymentSettings, savePaymentSettings } from '../services/paymentSettings';
-import { canReviseBackend } from '../services/roles';
+import {
+  accountVisibleTo,
+  canReviseBackend,
+  digitsOnly,
+  isOwnAccount,
+  isSheetOwner,
+  listStaffAccounts,
+  registerStaffAccount,
+  removeStaffAccount,
+  ROLE_KEEPER,
+  ROLE_OWNER,
+} from '../services/roles';
 import { formatMmk } from '../services/currency';
 
 const STORE_CATEGORIES = CATEGORIES.filter((c) => c.id !== 'all');
@@ -79,7 +94,7 @@ export function AdminPanelModal({
   onShowToast,
   user,
 }) {
-  const [activeAdminTab, setActiveAdminTab] = useState('editor'); // 'editor' | 'add' | 'payment' | 'n8n'
+  const [activeAdminTab, setActiveAdminTab] = useState('editor'); // 'editor' | 'add' | 'payment' | 'users' | 'n8n'
   const [editingItem, setEditingItem] = useState(null);
   const [n8nConfig, setN8nConfig] = useState(getBackendN8NConfig());
   const [logs, setLogs] = useState(getBackendLogs());
@@ -90,6 +105,39 @@ export function AdminPanelModal({
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
   const [newItem, setNewItem] = useState(emptyNewItem);
+  const [sheetUsers, setSheetUsers] = useState([]);
+  const [usersFromSheet, setUsersFromSheet] = useState(false);
+  const [usersLoading, setUsersLoading] = useState(false);
+  const [usersNote, setUsersNote] = useState('');
+  const [newAccount, setNewAccount] = useState({
+    name: '',
+    phone: '',
+    email: '',
+    role: ROLE_KEEPER,
+    active: 'Yes',
+  });
+
+  const loadSheetUsers = async () => {
+    setUsersLoading(true);
+    setUsersNote('');
+    const listed = await listSheetUsers(user);
+    const hideOwner = (rows) => (rows || []).filter((account) => accountVisibleTo(user, account));
+    if (!listed.connected) {
+      setUsersFromSheet(false);
+      setSheetUsers(hideOwner(listStaffAccounts()));
+      setUsersNote('The Users sheet is not connected. These accounts cannot be deleted until the sheet accepts the change.');
+      setUsersLoading(false);
+      return;
+    }
+    setUsersFromSheet(true);
+    setSheetUsers(hideOwner(listed.users));
+    setUsersLoading(false);
+  };
+
+  useEffect(() => {
+    if (!isOpen || activeAdminTab !== 'users') return;
+    loadSheetUsers();
+  }, [isOpen, activeAdminTab]);
 
   useEffect(() => {
     if (!items?.length) return;
@@ -230,6 +278,74 @@ export function AdminPanelModal({
     publishCatalog(copy, 'Storefront order updated');
   };
 
+  const canCreateUsers = isSheetOwner(user);
+  const canDeleteUsers = isSheetOwner(user) && usersFromSheet;
+
+  const handleAddAccount = async () => {
+    if (!canCreateUsers) {
+      onShowToast('Only the shop account can add a business owner or shop keeper.');
+      return;
+    }
+    const name = newAccount.name.trim();
+    const phone = digitsOnly(newAccount.phone);
+    const email = newAccount.email.trim();
+    if (name.length < 2 || phone.length < 6) {
+      onShowToast('Enter a name and a valid phone number.');
+      return;
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      onShowToast('Enter a valid email, or leave it blank.');
+      return;
+    }
+    const emailKey = email.toLowerCase();
+    const phoneKey = phone.replace(/^0+/, '');
+    if (emailKey && sheetUsers.some((account) => {
+      const accountEmail = String(account.email || '').trim().toLowerCase();
+      const accountPhone = digitsOnly(account.phone).replace(/^0+/, '');
+      return accountEmail === emailKey && accountPhone !== phoneKey;
+    })) {
+      onShowToast('That email is already on the Users sheet. Each account needs its own email.');
+      return;
+    }
+    setUsersLoading(true);
+    const saved = await saveSheetUser({ ...newAccount, name, phone, email, viewer: user });
+    if (!saved.connected || saved.saved === false) {
+      setUsersLoading(false);
+      onShowToast(saved.message || 'The Users sheet did not add this account.');
+      return;
+    }
+    registerStaffAccount({ name, phone, email, role: newAccount.role });
+    setNewAccount({ name: '', phone: '', email: '', role: ROLE_KEEPER, active: 'Yes' });
+    await loadSheetUsers();
+    onShowToast('Account added to the Users sheet.');
+  };
+
+  const handleDeleteAccount = async (account) => {
+    if (!isSheetOwner(user) || !usersFromSheet) {
+      onShowToast('Only the shop account can delete a user, and the Users sheet has to accept it.');
+      return;
+    }
+    if (isOwnAccount(user, account)) {
+      onShowToast('You cannot remove the account you are signed in with.');
+      return;
+    }
+    if (!window.confirm(`Delete ${account.name || account.phone} from the Users sheet?`)) return;
+    setUsersLoading(true);
+    const removed = await deleteSheetUser({
+      phone: account.phone,
+      actorPhone: user?.phone,
+      actorEmail: user?.email,
+    });
+    if (!removed.connected || !removed.deleted) {
+      setUsersLoading(false);
+      onShowToast(removed.message || 'The Users sheet did not remove that account.');
+      return;
+    }
+    removeStaffAccount(account.phone);
+    await loadSheetUsers();
+    onShowToast('Account deleted from the Users sheet.');
+  };
+
   const handleReset = () => {
     if (confirm('Reset catalog back to original default showcase items?')) {
       const def = resetCatalogToDefault();
@@ -248,7 +364,7 @@ export function AdminPanelModal({
   const handleSaveN8NConfig = (e) => {
     e.preventDefault();
     if (!canReviseBackend(user)) {
-      onShowToast('Only kyawzin can revise backend automation.');
+      onShowToast('Only the shop account that set up automation can revise it.');
       return;
     }
     saveBackendN8NConfig(n8nConfig);
@@ -258,7 +374,7 @@ export function AdminPanelModal({
   // Test n8n ping
   const handleTestN8N = async () => {
     if (!canReviseBackend(user)) {
-      onShowToast('Only kyawzin can revise backend automation.');
+      onShowToast('Only the shop account that set up automation can revise it.');
       return;
     }
     setIsTestingN8N(true);
@@ -320,6 +436,13 @@ export function AdminPanelModal({
           >
             <Banknote size={15} />
             <span>Payment & Bank</span>
+          </button>
+          <button
+            className={`admin-tab ${activeAdminTab === 'users' ? 'on' : ''}`}
+            onClick={() => setActiveAdminTab('users')}
+          >
+            <Users size={15} />
+            <span>Users</span>
           </button>
           <button
             className={`admin-tab ${activeAdminTab === 'n8n' ? 'on' : ''}`}
@@ -858,6 +981,73 @@ export function AdminPanelModal({
           </div>
         )}
 
+        {activeAdminTab === 'users' && (
+          <div className="n8n-console-body" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
+            <div className="admin-live-banner">
+              {canCreateUsers
+                ? 'Add or delete other accounts on the Users sheet. The account you are signed in with stays. A shared email does not make two phones the same account.'
+                : 'You can see accounts here. Only the shop account can add or delete a user, and that change is saved on the Users sheet.'}
+            </div>
+            {usersNote && (
+              <div className="admin-note">
+                <p style={{ fontSize: '0.78rem', color: '#57534e', margin: 0 }}>{usersNote}</p>
+              </div>
+            )}
+            {canCreateUsers && (
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr 0.9fr auto', gap: 8, marginTop: 12 }}>
+              <input className="input-n8n" placeholder="Name" value={newAccount.name} onChange={(e) => setNewAccount({ ...newAccount, name: e.target.value })} />
+              <input className="input-n8n" placeholder="09…" inputMode="tel" value={newAccount.phone} onChange={(e) => setNewAccount({ ...newAccount, phone: e.target.value })} />
+              <input className="input-n8n" placeholder="Email (optional)" type="email" value={newAccount.email} onChange={(e) => setNewAccount({ ...newAccount, email: e.target.value })} />
+              <select className="input-n8n" value={newAccount.role} onChange={(e) => setNewAccount({ ...newAccount, role: e.target.value })}>
+                <option value={ROLE_KEEPER}>Shop Keeper</option>
+                <option value={ROLE_OWNER}>Business Owner</option>
+              </select>
+              <button type="button" className="admin-save-btn" onClick={handleAddAccount} disabled={usersLoading}>
+                <Plus size={14} /> Add
+              </button>
+            </div>
+            )}
+            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {sheetUsers.length === 0 && !usersLoading && (
+                <p style={{ fontSize: '0.8rem', color: '#57534e' }}>No accounts on the Users sheet yet.</p>
+              )}
+              {sheetUsers.map((account) => {
+                const signedIn = isOwnAccount(user, account);
+                const emailKey = String(account.email || '').trim().toLowerCase();
+                const sharedEmail = Boolean(emailKey) && sheetUsers.filter((row) => (
+                  String(row.email || '').trim().toLowerCase() === emailKey
+                )).length > 1;
+                return (
+                  <div key={`${account.phone}-${account.role}`} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 12, background: '#f6f3ee' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, color: '#1c1917' }}>{account.name || 'Staff'}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#57534e' }}>
+                        {account.phone} · {account.role} · {account.active === 'No' ? 'Inactive' : 'Active'}
+                        {account.email ? ` · ${account.email}` : ''}
+                        {sharedEmail ? ' · Shared email' : ''}
+                      </div>
+                    </div>
+                    {signedIn ? (
+                      <span style={{ fontSize: '0.72rem', fontWeight: 700, color: '#57534e' }}>Signed in</span>
+                    ) : canDeleteUsers ? (
+                      <button
+                        type="button"
+                        className="admin-close-btn"
+                        aria-label={`Delete ${account.name || account.phone}`}
+                        disabled={usersLoading}
+                        title="Delete account"
+                        onClick={() => handleDeleteAccount(account)}
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Tab 4: Backend Automation (n8n) */}
         {activeAdminTab === 'n8n' && (
           <div className="n8n-console-body" style={{ maxHeight: '72vh', overflowY: 'auto' }}>
@@ -877,7 +1067,7 @@ export function AdminPanelModal({
                   Backend automation is locked.
                 </p>
                 <p style={{ fontSize: '0.78rem', color: '#57534e', marginTop: 6, lineHeight: 1.45 }}>
-                  Business owners can run the shop. Only kyawzin (kyawzin.ccna@gmail.com) can edit or revise this automation.
+                  Business owners can run the shop. Automation settings stay with the account that set them up.
                 </p>
               </div>
             ) : (

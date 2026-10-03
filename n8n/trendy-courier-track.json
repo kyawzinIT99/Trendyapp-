@@ -1,0 +1,84 @@
+{
+  "name": "Trendy \u2014 Hired courier tracking",
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "nodes": [
+    {
+      "id": "courier-webhook",
+      "name": "Courier webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "trendy-courier-track",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "trendy-courier-track",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "qJHntaeO3XTtQrjz",
+          "name": "Trendy App Webhook Header"
+        }
+      }
+    },
+    {
+      "id": "courier-route",
+      "name": "Route hired courier",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        280,
+        0
+      ],
+      "parameters": {
+        "jsCode": "\nconst body = $input.first().json.body || $input.first().json;\nconst eventType = body.eventType || '';\nconst data = body.data || {};\nconst store = $getWorkflowStaticData('global');\nif (!store.shipments) store.shipments = {};\n\nconst NAMES = {\n  'th-flash': 'Flash Express',\n  'th-kerry': 'Kerry Express',\n  'th-post': 'Thailand Post',\n  'th-jt': 'J&T Express',\n  'cm-sameday': 'Chiang Mai same-day',\n};\nconst STEPS = ['placed', 'booked', 'pickup', 'transit', 'delivered'];\n\nfunction noteFor(row) {\n  if (row.current === 'booked') return row.courierName + ' is hired. The trail updates after they pick up the parcel.';\n  if (row.current === 'pickup') return row.courierName + ' picked up the parcel.';\n  if (row.current === 'transit') {\n    return row.trackingNumber\n      ? row.courierName + ' is carrying this order. Tracking number ' + row.trackingNumber + '.'\n      : row.courierName + ' is carrying this order.';\n  }\n  if (row.current === 'delivered') return row.courierName + ' delivered this order.';\n  return row.courierName + ' has this order.';\n}\n\nfunction present(row) {\n  return {\n    success: true,\n    found: true,\n    orderId: row.orderId,\n    courierId: row.courierId,\n    courierName: row.courierName,\n    current: STEPS.includes(row.current) ? row.current : 'booked',\n    trackingNumber: row.trackingNumber || '',\n    updatedAt: row.updatedAt,\n    statusNote: row.statusNote || noteFor(row),\n  };\n}\n\nfunction remember(row) {\n  const ids = Object.keys(store.shipments);\n  if (ids.length > 200) {\n    ids.sort((a, b) => String(store.shipments[a].updatedAt).localeCompare(String(store.shipments[b].updatedAt)));\n    ids.slice(0, ids.length - 200).forEach((id) => { delete store.shipments[id]; });\n  }\n  store.shipments[row.orderId] = row;\n}\n\nif (eventType === 'order.courier_book') {\n  const existing = store.shipments[data.orderId];\n  if (existing && existing.trackingToken === data.trackingToken) {\n    return [{ json: present(existing) }];\n  }\n  const courierName = NAMES[data.courierId] || data.courierName || 'Hired courier';\n  const row = {\n    orderId: data.orderId,\n    trackingToken: data.trackingToken,\n    courierId: data.courierId || '',\n    courierName,\n    regionState: data.regionState || '',\n    country: data.country || 'Thailand',\n    trackingNumber: '',\n    current: 'booked',\n    updatedAt: new Date().toISOString(),\n    statusNote: '',\n  };\n  row.statusNote = noteFor(row);\n  remember(row);\n  return [{ json: present(row) }];\n}\n\nif (eventType === 'order.courier_event') {\n  const row = store.shipments[data.orderId];\n  if (!row || row.trackingToken !== data.trackingToken) {\n    return [{ json: { success: true, found: false, message: 'Courier shipment not booked yet' } }];\n  }\n  if (STEPS.includes(data.current)) row.current = data.current;\n  if (data.trackingNumber) row.trackingNumber = String(data.trackingNumber);\n  row.updatedAt = new Date().toISOString();\n  row.statusNote = data.statusNote || noteFor(row);\n  remember(row);\n  return [{ json: present(row) }];\n}\n\nif (eventType === 'order.courier_track') {\n  const orders = Array.isArray(data.orders) ? data.orders : [{ orderId: data.orderId, trackingToken: data.trackingToken }];\n  const results = {};\n  orders.forEach((order) => {\n    const row = store.shipments[order.orderId];\n    if (!row || row.trackingToken !== order.trackingToken) {\n      results[order.orderId] = { success: true, found: false, message: 'Courier shipment not booked yet' };\n      return;\n    }\n    results[order.orderId] = present(row);\n  });\n  return [{ json: { success: true, batch: true, results } }];\n}\n\nreturn [{ json: { success: false, found: false, message: 'Unknown courier event' } }];\n"
+      }
+    },
+    {
+      "id": "courier-respond",
+      "name": "Respond \u2014 Courier trail",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        0
+      ],
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Courier webhook": {
+      "main": [
+        [
+          {
+            "node": "Route hired courier",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Route hired courier": {
+      "main": [
+        [
+          {
+            "node": "Respond \u2014 Courier trail",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  }
+}

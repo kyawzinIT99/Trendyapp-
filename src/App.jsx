@@ -13,7 +13,7 @@ import { OrdersTab } from './components/OrdersTab';
 import { SignInScreen } from './components/SignInScreen';
 import { getStoredItems, saveStoredItems, CATEGORIES } from './services/api';
 import { hydrateCatalog, catalogNeedsRewrite, isUploadedImageRef, catalogPhotoFor } from './services/catalogImages';
-import { dispatchBackendN8NEvent, lookupOrdersTracking, lookupOrderTracking, dispatchOrderSubmitted, withTrackingToken, TRACKING_POLL_MS } from './services/n8nService';
+import { dispatchBackendN8NEvent, lookupOrdersTracking, lookupOrderTracking, lookupCourierTracking, bookCourierShipment, reportCourierPickup, reportCourierStep, dispatchOrderSubmitted, withTrackingToken, TRACKING_POLL_MS } from './services/n8nService';
 import {
   getCurrentUser, saveUser, signOut, getActiveUserId,
   getUserCart, saveUserCart,
@@ -230,7 +230,8 @@ export default function App() {
   };
 
   const handleOrderConfirmed = async (rawOrder) => {
-    const order = (!user || isSheetOwner(user) || !user.ordersSheetId)
+    const hired = rawOrder.trackingMode === 'api';
+    const order = (hired || !user || isSheetOwner(user) || !user.ordersSheetId)
       ? rawOrder
       : { ...rawOrder, ordersSheetId: user.ordersSheetId };
     bindStarted.current.add(order.orderId);
@@ -238,6 +239,19 @@ export default function App() {
     setCheckoutView('confirm');
     setOrders(prev => [order, ...prev]);
     setCartItems([]);
+    if (hired) {
+      const booked = await bookCourierShipment(order);
+      if (booked.success) {
+        setOrders((previous) => previous.map((item) => (
+          item.orderId === order.orderId ? { ...item, ...booked.update } : item
+        )));
+        showToast(t('toast.orderOk', { id: order.orderId }));
+      } else {
+        bindStarted.current.delete(order.orderId);
+        showToast(t('toast.orderLocal', { id: order.orderId }));
+      }
+      return;
+    }
     const submitted = await dispatchOrderSubmitted(order);
     if (submitted.success) {
       setOrders((previous) => previous.map((item) => (
@@ -279,6 +293,20 @@ export default function App() {
   useEffect(() => {
     orders.forEach((order) => {
       if (!order.trackingToken || order.sheetBound) return;
+      if (order.trackingMode === 'api') {
+        if (order.courierBound || bindStarted.current.has(order.orderId)) return;
+        bindStarted.current.add(order.orderId);
+        bookCourierShipment(order).then((booked) => {
+          if (!booked.success) {
+            bindStarted.current.delete(order.orderId);
+            return;
+          }
+          setOrders((previous) => previous.map((item) => (
+            item.orderId === order.orderId ? { ...item, ...booked.update } : item
+          )));
+        });
+        return;
+      }
       if (bindStarted.current.has(order.orderId)) return;
       bindStarted.current.add(order.orderId);
       (async () => {
@@ -313,16 +341,22 @@ export default function App() {
 
   const refreshTracking = useCallback(async () => {
     if (typeof document !== 'undefined' && document.hidden) return;
-    const trackable = ordersRef.current
-      .filter((order) => order.orderId && order.trackingToken)
-      .map(attachOwnSheet);
-    if (trackable.length === 0) {
+    const openOrders = ordersRef.current.filter((order) => order.orderId && order.trackingToken);
+    const trackable = openOrders.filter((order) => order.trackingMode !== 'api').map(attachOwnSheet);
+    const hired = openOrders.filter((order) => order.trackingMode === 'api');
+    if (openOrders.length === 0) {
       setTrackingSync({ status: 'idle', lastChecked: null, error: '' });
       return;
     }
 
     setTrackingSync((previous) => ({ ...previous, status: 'refreshing', error: '' }));
-    const { success, updates, error } = await lookupOrdersTracking(trackable);
+    const [sheetResult, courierResult] = await Promise.all([
+      trackable.length ? lookupOrdersTracking(trackable) : Promise.resolve({ success: true, updates: [] }),
+      hired.length ? lookupCourierTracking(hired) : Promise.resolve({ success: true, updates: [] }),
+    ]);
+    const updates = [...(sheetResult.updates || []), ...(courierResult.updates || [])];
+    const success = (trackable.length === 0 || sheetResult.success) && (hired.length === 0 || courierResult.success || (courierResult.updates || []).length > 0);
+    const error = [sheetResult.error, courierResult.error].filter(Boolean).join(' ');
 
     if (updates.length > 0) {
       setOrders((previous) => {
@@ -333,14 +367,22 @@ export default function App() {
           const update = hit.result.update;
           const sheetId = order.ordersSheetId || hit.ordersSheetId || '';
           const same =
-            order.deliveryStatus === update.deliveryStatus &&
-            order.paymentStatus === update.paymentStatus &&
+            (update.deliveryStatus == null || order.deliveryStatus === update.deliveryStatus) &&
+            (update.paymentStatus == null || order.paymentStatus === update.paymentStatus) &&
             (order.statusNote || '') === (update.statusNote || '') &&
             (order.statusUpdatedAt || '') === (update.statusUpdatedAt || '') &&
-            (order.ordersSheetId || '') === sheetId;
+            (order.ordersSheetId || '') === sheetId &&
+            (order.courierStep || '') === (update.courierStep || '') &&
+            (order.trackingNumber || '') === (update.trackingNumber || '');
           if (same) return order;
           changed = true;
-          return { ...order, ...update, ordersSheetId: sheetId || order.ordersSheetId, sheetBound: true };
+          const hired = order.trackingMode === 'api';
+          return {
+            ...order,
+            ...update,
+            ordersSheetId: sheetId || order.ordersSheetId,
+            sheetBound: hired ? order.sheetBound : true,
+          };
         });
         return changed ? next : previous;
       });
@@ -622,6 +664,32 @@ export default function App() {
                 catalog={items}
                 trackingSync={trackingSync}
                 onRefreshTracking={refreshTracking}
+                onChooseHandoff={(order, handoff) => {
+                  const statusNote = handoff === 'dropoff'
+                    ? t('handoff.dropoffHint', { courier: order.courierName || order.delivery?.label || '' })
+                    : t('handoff.pickupHint', { courier: order.courierName || order.delivery?.label || '' });
+                  setOrders((previous) => previous.map((item) => (
+                    item.orderId === order.orderId ? { ...item, handoff, statusNote } : item
+                  )));
+                }}
+                onMarkHandoff={async (order) => {
+                  const reported = await reportCourierStep(order, { current: 'pickup' });
+                  if (!reported.success) return;
+                  const statusNote = t('handoff.withCourier', { courier: order.courierName || order.delivery?.label || '' });
+                  setOrders((previous) => previous.map((item) => (
+                    item.orderId === order.orderId ? { ...item, ...reported.update, statusNote } : item
+                  )));
+                }}
+                onSaveTrackingNumber={async (order, trackingNumber) => {
+                  const reported = await reportCourierPickup(order, trackingNumber);
+                  if (!reported.success) return;
+                  setOrders((previous) => previous.map((item) => (
+                    item.orderId === order.orderId ? { ...item, ...reported.update } : item
+                  )));
+                  setCurrentOrder((previous) => (
+                    previous?.orderId === order.orderId ? { ...previous, ...reported.update } : previous
+                  ));
+                }}
                 sheetOwner={canReviseBackend(user)}
               />
             )}

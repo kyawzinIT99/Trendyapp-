@@ -539,12 +539,159 @@ function orderWithoutPhotos(order) {
       street: address.street || '',
       township: address.township || '',
       regionState: address.regionState || '',
-      country: 'Myanmar',
+      country: address.country || 'Myanmar',
     },
     payment: order?.payment?.id
       ? { id: order.payment.id, label: order.payment.label }
       : { id: 'guest', label: 'Guest checkout' },
     items: (order?.items || []).map(({ id, name, price, quantity }) => ({ id, name, price, quantity })),
+  };
+}
+
+const COURIER_STEPS = ['placed', 'booked', 'pickup', 'transit', 'delivered'];
+
+function courierWebhookUrl() {
+  const config = getBackendN8NConfig();
+  if (!config.webhookUrl) return '';
+  try {
+    const url = new URL(config.webhookUrl);
+    url.pathname = '/webhook/trendy-courier-track';
+    url.search = '';
+    url.hash = '';
+    return url.toString();
+  } catch {
+    return '';
+  }
+}
+
+async function postCourierEvent(eventType, data, { signal } = {}) {
+  const config = getBackendN8NConfig();
+  const target = courierWebhookUrl();
+  if (!config.enabled || !target) {
+    return { ok: false, error: 'Courier tracking is unavailable' };
+  }
+  const controller = new AbortController();
+  const relayAbort = () => controller.abort();
+  signal?.addEventListener('abort', relayAbort, { once: true });
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(target, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Trendy-Backend-Secret': ENV_N8N_WEBHOOK_TOKEN || config.secretToken || '',
+      },
+      body: JSON.stringify({
+        eventId: `ev_courier_${Math.random().toString(36).slice(2, 10)}`,
+        eventType,
+        timestamp: new Date().toISOString(),
+        app: 'Trendy Mobile Engine',
+        environment: 'production',
+        data,
+      }),
+      signal: controller.signal,
+    });
+    if (!response.ok) return { ok: false, error: `Courier tracking returned HTTP ${response.status}` };
+    const text = await response.text();
+    if (!text) return { ok: false, error: 'Courier tracking returned an empty response' };
+    return { ok: true, payload: JSON.parse(text) };
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      return { ok: false, error: signal?.aborted ? 'Tracking refresh cancelled' : 'Courier tracking timed out' };
+    }
+    return { ok: false, error: 'Could not reach courier tracking' };
+  } finally {
+    clearTimeout(timeoutId);
+    signal?.removeEventListener('abort', relayAbort);
+  }
+}
+
+function parseCourierUpdate(result) {
+  if (!result?.success || !result?.found) {
+    return {
+      success: false,
+      notFound: result?.found === false,
+      error: result?.message || 'Courier shipment not found',
+    };
+  }
+  const current = COURIER_STEPS.includes(result.current) ? result.current : 'booked';
+  return {
+    success: true,
+    update: {
+      courierStep: current,
+      courierName: result.courierName || '',
+      trackingNumber: result.trackingNumber || '',
+      statusNote: result.statusNote || '',
+      statusUpdatedAt: result.updatedAt || '',
+      courierBound: true,
+    },
+  };
+}
+
+export async function bookCourierShipment(order) {
+  const address = order?.address || {};
+  const posted = await postCourierEvent('order.courier_book', {
+    orderId: order.orderId,
+    trackingToken: order.trackingToken,
+    courierId: order.courierId || order.delivery?.id || '',
+    courierName: order.courierName || order.delivery?.label || '',
+    regionState: address.regionState || '',
+    country: address.country || 'Thailand',
+  });
+  if (!posted.ok) return { success: false, error: posted.error };
+  return parseCourierUpdate(posted.payload);
+}
+
+export async function reportCourierStep(order, { current, trackingNumber = '' }) {
+  const number = String(trackingNumber || '').trim();
+  const posted = await postCourierEvent('order.courier_event', {
+    orderId: order.orderId,
+    trackingToken: order.trackingToken,
+    current,
+    trackingNumber: number,
+  });
+  if (!posted.ok) {
+    return {
+      success: true,
+      update: {
+        courierStep: current,
+        trackingNumber: number,
+        statusNote: '',
+        statusUpdatedAt: new Date().toISOString(),
+        courierBound: true,
+      },
+    };
+  }
+  return parseCourierUpdate(posted.payload);
+}
+
+export async function reportCourierPickup(order, trackingNumber) {
+  return reportCourierStep(order, { current: 'transit', trackingNumber });
+}
+
+export async function lookupCourierTracking(orders, { signal } = {}) {
+  const trackable = (orders || []).filter((order) => order?.orderId && order?.trackingToken);
+  if (trackable.length === 0) return { success: true, updates: [] };
+  const posted = await postCourierEvent('order.courier_track', {
+    orders: trackable.map((order) => ({
+      orderId: order.orderId,
+      trackingToken: order.trackingToken,
+    })),
+  }, { signal });
+  if (!posted.ok) return { success: false, updates: [], error: posted.error };
+  const payload = posted.payload || {};
+  const resultMap = payload.batch ? (payload.results || {}) : { [trackable[0].orderId]: payload };
+  const updates = [];
+  let error = '';
+  trackable.forEach((order) => {
+    const parsed = parseCourierUpdate(resultMap[order.orderId]);
+    if (parsed.success) updates.push({ orderId: order.orderId, result: parsed });
+    else if (!error) error = parsed.error;
+  });
+  return {
+    success: updates.length > 0,
+    updates,
+    error: updates.length > 0 ? '' : (error || 'Courier tracking is temporarily unavailable'),
   };
 }
 
